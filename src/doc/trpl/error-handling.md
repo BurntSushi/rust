@@ -64,9 +64,9 @@ could [`panic`](http://doc.rust-lang.org/std/macro.panic!.html) whenever we
 come across something unexpected. (`panic` causes the current task to unwind,
 and in most cases, the entire program aborts.) Here's an example:
 
-```rust
+```rust,should_panic
 // Guess a number between 1 and 10.
-// If it matches the number we had in mind, return true. Else, return false.
+// If it matches the number I had in mind, return true. Else, return false.
 fn guess(n: i32) -> bool {
     if n < 1 || n > 10 {
         panic!("Invalid number: {}", n);
@@ -81,14 +81,14 @@ fn main() {
 
 If you try running this code, the program will crash with a message like this:
 
-```
+```text
 thread '<main>' panicked at 'Invalid number: 11', src/bin/panic-simple.rs:5
 ```
 
 Here's another example that is slightly less contrived. A program that accepts
 an integer as an argument, doubles it and prints it.
 
-```rust
+```rust,should_panic
 use std::env;
 
 fn main() {
@@ -97,9 +97,6 @@ fn main() {
     let n: i32 = arg.parse().unwrap(); // error 2
     println!("{}", 2 * n);
 }
-
-// $ cargo run --bin unwrap-double 5
-// 10
 ```
 
 If you give this program zero arguments (error 1) or if the first argument
@@ -155,6 +152,10 @@ fn find(haystack: &str, needle: char) -> Option<usize> {
 }
 ```
 
+(Pro-tip: don't use this code. Instead, use the
+[`find`](http://doc.rust-lang.org/std/primitive.str.html#method.find)
+method from the standard library.)
+
 Notice that when this function finds a matching character, it doen't just
 return the `offset`. Instead, it returns `Some(offset)`. `Some` is a variant or
 a *value constructor* for the `Option` type. You can think of it as a function
@@ -167,7 +168,8 @@ story. The other half is *using* the `find` function we've written. Let's try
 to use it to find the extension in a file name.
 
 ```rust
-fn main_find() {
+# fn find(_: &str, _: char) -> Option<usize> { None }
+fn main() {
     let file_name = "foobar.rs";
     match find(file_name, '.') {
         None => println!("No file extension found."),
@@ -177,7 +179,7 @@ fn main_find() {
 ```
 
 This code uses [pattern
-matching](http://doc.rust-lang.org/1.0.0-beta.5/book/patterns.html) to do *case
+matching](http://doc.rust-lang.org/book/patterns.html) to do *case
 analysis* on the `Option<usize>` returned by the `find` function. In fact, case
 analysis is the only way to get at the value stored inside an `Option<T>`. This
 means that you, as the programmer, must handle the case when an `Option<T>` is
@@ -224,6 +226,7 @@ Getting the extension of a file name is a pretty common operation, so it makes
 sense to put it into a function:
 
 ```rust
+# fn find(_: &str, _: char) -> Option<usize> { None }
 // Returns the extension of the given file name, where the extension is defined
 // as all characters proceding the first `.`.
 // If `file_name` has no `.`, then `None` is returned.
@@ -234,6 +237,10 @@ fn extension_explicit(file_name: &str) -> Option<&str> {
     }
 }
 ```
+
+(Pro-tip: don't use this code. Use the
+[`extension`](http://doc.rust-lang.org/std/path/struct.Path.html#method.extension)
+method in the standard library instead.)
 
 The code stays simple, but the important thing to notice is that the type of
 `find` forces us to consider the possibility of absence. This is a good thing
@@ -267,6 +274,7 @@ Armed with our new combinator, we can rewrite our `extension_explicit` method
 to get rid of the case analysis:
 
 ```rust
+# fn find(_: &str, _: char) -> Option<usize> { None }
 // Returns the extension of the given file name, where the extension is defined
 // as all characters proceding the first `.`.
 // If `file_name` has no `.`, then `None` is returned.
@@ -294,6 +302,18 @@ The trick here is that the default value must have the same type as the value
 that might be inside the `Option<T>`. Using it is dead simple in our case:
 
 ```rust
+# fn find(haystack: &str, needle: char) -> Option<usize> {
+#     for (offset, c) in haystack.char_indices() {
+#         if c == needle {
+#             return Some(offset);
+#         }
+#     }
+#     None
+# }
+#
+# fn extension(file_name: &str) -> Option<&str> {
+#     find(file_name, '.').map(|i| &file_name[i+1..])
+# }
 fn main() {
     assert_eq!(extension("foobar.csv").unwrap_or("rs"), "csv");
     assert_eq!(extension("foobar").unwrap_or("rs"), "rs");
@@ -321,6 +341,7 @@ So, we are tasked with the challenge of finding an extension given a file
 *path*. Let's start with explicit case analysis:
 
 ```rust
+# fn extension(file_name: &str) -> Option<&str> { None }
 fn file_path_ext_explicit(file_path: &str) -> Option<&str> {
     match file_name(file_path) {
         None => None,
@@ -357,6 +378,8 @@ fn and_then<F, T, A>(option: Option<T>, f: F) -> Option<A>
 Now we can rewrite our `file_path_ext` function without explicit case analysis:
 
 ```rust
+# fn extension(file_name: &str) -> Option<&str> { None }
+# fn file_name(file_path: &str) -> Option<&str> { None }
 fn file_path_ext(file_path: &str) -> Option<&str> {
     file_name(file_path).and_then(extension)
 }
@@ -413,6 +436,7 @@ defined](http://doc.rust-lang.org/std/result/enum.Result.html#method.unwrap)
 in the standard library. Let's define it:
 
 ```rust
+# enum Result<T, E> { Ok(T), Err(E) }
 impl<T, E: ::std::fmt::Debug> Result<T, E> {
     fn unwrap(self) -> T {
         match self {
@@ -457,7 +481,7 @@ fn main() {
 At this point, you should be skeptical of calling `unwrap`. For example, if
 the string doesn't parse as a number, you'll get a panic:
 
-```rust
+```text
 thread '<main>' panicked at 'called `Result::unwrap()` on an `Err` value: ParseIntError { kind: InvalidDigit }', /home/rustbuild/src/rust-buildbot/slave/beta-dist-rustc-linux/build/src/libcore/result.rs:729
 ```
 
@@ -469,7 +493,7 @@ signature of the
 [`parse` method](http://doc.rust-lang.org/std/primitive.str.html#method.parse)
 in the standard library:
 
-```rust
+```rust,ignore
 impl str {
     fn parse<F: FromStr>(&self) -> Result<F, F::Err>;
 }
@@ -494,7 +518,7 @@ explicitness for the moment. We only care about `i32`, so we need to
 `FromStr`](http://doc.rust-lang.org/std/primitive.i32.html)
 (do a `CTRL-F` in your browser for "FromStr")
 and look at its [associated
-type](http://doc.rust-lang.org/1.0.0-beta.5/book/associated-types.html) `Err`.
+type](http://doc.rust-lang.org/book/associated-types.html) `Err`.
 We did this so we can find the concrete error type. In this case, it's
 [`std::num::ParseIntError`](http://doc.rust-lang.org/std/num/struct.ParseIntError.html).
 Finally, we can rewrite our function:
@@ -644,7 +668,7 @@ or can we continue using combinators?
 
 For now, let's revisit one of the first examples in this chapter:
 
-```rust
+```rust,should_panic
 use std::env;
 
 fn main() {
@@ -653,9 +677,6 @@ fn main() {
     let n: i32 = arg.parse().unwrap(); // error 2
     println!("{}", 2 * n);
 }
-
-// $ cargo run --bin unwrap-double 5
-// 10
 ```
 
 Given our new found knowledge of `Option`, `Result` and their various
@@ -729,7 +750,7 @@ instead of the error handling, and it exposes the points where proper error
 handling need to occur. Let's start there so we can get a handle on the code,
 and then refactor it to use better error handling.
 
-```rust
+```rust,should_panic
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
@@ -1012,6 +1033,8 @@ simply convert them to our `CliError` type using the corresponding value
 constructor:
 
 ```rust
+# #[derive(Debug)]
+# enum CliError { Io(::std::io::Error), Parse(::std::num::ParseIntError) }
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
@@ -1088,7 +1111,7 @@ The first two are a result of `Error` requiring impls for both `Debug` and
 `Display`. The latter two are from the two methods defined on `Error`. The
 power of `Error` comes from the fact that all error types impl `Error`, which
 means errors can be existentially quantified as a
-[trait object](http://doc.rust-lang.org/1.0.0-beta.5/book/trait-objects.html).
+[trait object](http://doc.rust-lang.org/book/trait-objects.html).
 This manifests as either `Box<Error>` or `&Error`. Indeed, the `cause` method
 returns an `&Error`, which is itself a trait object. We'll revisit the
 `Error` trait's utility as a trait object later.
@@ -1118,7 +1141,7 @@ variants to the `enum` definition.
 Implementing `Error` is pretty straight-forward. It's mostly going to be a lot
 explicit case analysis.
 
-```rust
+```rust,ignore
 use std::error;
 use std::fmt;
 
@@ -1195,11 +1218,9 @@ let cow: ::std::borrow::Cow<str> = From::from("foo");
 OK, so `From` is useful for converting between strings. But what about errors?
 It turns out, there is one critical impl:
 
-```rust
+```rust,ignore
 impl<'a, E: Error + 'a> From<E> for Box<Error + 'a>
 ```
-
-<!-- For stupid syntax highlighting, close the quote: ' -->
 
 This impl says that for *any* type that impls `Error`, we can convert it to a
 trait object `Box<Error>`. This may not seem terribly surprising, but it is
@@ -1372,6 +1393,11 @@ Of course, it is easy to fix this! Since we defined `CliError`, we can impl
 `From` with it:
 
 ```rust
+# #[derive(Debug)]
+# enum CliError { Io(io::Error), Parse(num::ParseIntError) }
+use std::io;
+use std::num;
+
 impl From<io::Error> for CliError {
     fn from(err: io::Error) -> CliError {
         CliError::Io(err)
@@ -1392,6 +1418,20 @@ corresponding value constructor. Indeed, it is *typically* this easy.
 We can finally rewrite `file_double`:
 
 ```rust
+# use std::io;
+# use std::num;
+# enum CliError { Io(::std::io::Error), Parse(::std::num::ParseIntError) }
+# impl From<io::Error> for CliError {
+#     fn from(err: io::Error) -> CliError { CliError::Io(err) }
+# }
+# impl From<num::ParseIntError> for CliError {
+#     fn from(err: num::ParseIntError) -> CliError { CliError::Parse(err) }
+# }
+
+use std::fs::File;
+use std::io::Read;
+use std::path::Path;
+
 fn file_double<P: AsRef<Path>>(file_path: P) -> Result<i32, CliError> {
     let mut file = try!(File::open(file_path));
     let mut contents = String::new();
@@ -1411,6 +1451,9 @@ convert a string to a float, then we'd need to add a new variant to our error
 type:
 
 ```rust
+use std::io;
+use std::num;
+
 enum CliError {
     Io(io::Error),
     ParseInt(num::ParseIntError),
@@ -1421,9 +1464,17 @@ enum CliError {
 And add a new `From` impl:
 
 ```rust
+# enum CliError {
+#     Io(::std::io::Error),
+#     ParseInt(num::ParseIntError),
+#     ParseFloat(num::ParseFloatError),
+# }
+
+use std::num;
+
 impl From<num::ParseFloatError> for CliError {
     fn from(err: num::ParseFloatError) -> CliError {
-        CliError::Parse(err)
+        CliError::ParseFloat(err)
     }
 }
 ```
@@ -1500,7 +1551,7 @@ The final code for this case study is
 [on Github](https://github.com/BurntSushi/rust-error-handling-case-study).
 If you have Rust and Cargo installed, then all you need to do is:
 
-```rust
+```text
 git clone git://github.com/BurntSushi/rust-error-handling-case-study
 cd rust-error-handling-case-study
 cargo build --release
@@ -1521,8 +1572,7 @@ and
 To get started from scratch, run `cargo new --bin city-pop` and make sure your
 `Cargo.toml` looks something like this:
 
-```rust
-
+```text
 [package]
 name = "city-pop"
 version = "0.1.0"
@@ -1532,19 +1582,17 @@ authors = ["Andrew Gallant <jamslam@gmail.com>"]
 name = "city-pop"
 
 [dependencies]
-csv = "0.*"
-docopt = "0.*"
-rustc-serialize = "0.*"
+csv = "0.14"
+docopt = "0.6"
+rustc-serialize = "0.3"
 ```
-
-<!--*-->
 
 You should already be able to run:
 
-```rust
+```text
 cargo build --release
 ./target/release/city-pop
-#Outputs: Hello, world!
+# Outputs: Hello, world!
 ```
 
 
@@ -1559,7 +1607,7 @@ string*. Once the parsing is done, we can decode the program arguments into a
 Rust struct. Here's our program with the appropriate `extern crate` statements,
 the usage string, our `Args` struct and an empty `main`:
 
-```rust
+```rust,ignore
 extern crate docopt;
 extern crate rustc_serialize;
 
@@ -1591,7 +1639,7 @@ of these functions can return a
 [`docopt::Error`](http://burntsushi.net/rustdoc/docopt/enum.Error.html).
 We can start with explicit case analysis:
 
-```rust
+```rust,ignore
 // These use statements were added below the `extern` statements.
 // I'll elide them in the future. Don't worry! It's all on Github:
 // https://github.com/BurntSushi/rust-error-handling-case-study
@@ -1619,7 +1667,13 @@ fn main() {
 This is not so nice. One thing we can do to make the code a bit clearer is to
 write a macro to print messages to `stderr` and then exit:
 
-```rust
+```rust,ignore
+macro_rules! fatal {
+    ($($tt:tt)*) => {{
+        use std::io::Write;
+        writeln!(&mut ::std::io::stderr(), $($tt)*).unwrap();
+        ::std::process::exit(1)
+    }}
 }
 ```
 
@@ -1629,7 +1683,7 @@ abort, but certainly, you could do something else if you needed to.
 
 The code looks nicer, but the explicit case analysis is still a drag:
 
-```rust
+```rust,ignore
 let args: Args = match Docopt::new(USAGE) {
     Err(err) => fatal!("{}", err),
     Ok(dopt) => match dopt.decode() {
@@ -1646,7 +1700,7 @@ type defines a convenient method
 which effectively does what we just did. Combine that with our knowledge of
 combinators, and we have concise, easy to read code:
 
-```rust
+```rust,ignore
 let args: Args = Docopt::new(USAGE)
                         .and_then(|d| d.decode())
                         .unwrap_or_else(|err| err.exit());
@@ -1670,7 +1724,7 @@ In this case study, the logic is really simple. All we need to do is parse the
 CSV data given to us and print out a field in matching rows. Let's do it. (Make
 sure to add `extern crate csv;` to the top of your file.)
 
-```rust
+```rust,ignore
 // This struct represents the data in each row of the CSV file.
 // Type based decoding absolves us of a lot of the nitty gritty error
 // handling, like parsing strings as integers or floats.
@@ -1752,7 +1806,7 @@ Let's refactor our code into its own function, but keep the calls to `unwrap`.
 Note that we opt to handle the possibility of a missing population count by
 simply ignoring that row.
 
-```rust
+```rust,ignore
 struct Row {
     // unchanged
 }
@@ -1809,7 +1863,7 @@ To convert this to proper error handling, we need to do the following:
 
 Let's try it:
 
-```rust
+```rust,ignore
 fn search<P: AsRef<Path>>
          (file_path: P, city: &str)
          -> Result<Vec<PopulationCount>, Box<Error+Send+Sync>> {
@@ -1847,7 +1901,7 @@ error type. We need these extra bounds so that we can use the
 [corresponding `From`
 impls](http://doc.rust-lang.org/std/convert/trait.From.html):
 
-```rust
+```rust,ignore
 // We are making use of this impl in the code above, since we call `From::from`
 // on a `&'static str`.
 impl<'a, 'b> From<&'b str> for Box<Error + Send + Sync + 'a>
@@ -1856,8 +1910,6 @@ impl<'a, 'b> From<&'b str> for Box<Error + Send + Sync + 'a>
 // error message, usually with `format!`.
 impl From<String> for Box<Error + Send + Sync>
 ```
-
-<!--'-->
 
 Now that we've seen how to do proper error handling with `Box<Error>`, let's
 try a different approach with our own custom error type. But first, let's take
@@ -1880,7 +1932,7 @@ have to do:
 
 First, here's the new usage and `Args` struct:
 
-```rust
+```rust,ignore
 static USAGE: &'static str = "
 Usage: city-pop [options] [<data-path>] <city>
        city-pop --help
@@ -1909,7 +1961,7 @@ ways we could go about this. One way is to write `search` such that it is
 generic on some type parameter `R` that satisfies `io::Read`. Another way is to
 just use trait objects:
 
-```rust
+```rust,ignore
 fn search<P: AsRef<Path>>
          (file_path: &Option<P>, city: &str)
          -> Result<Vec<PopulationCount>, Box<Error+Send+Sync>> {
@@ -1934,7 +1986,7 @@ and `From`.
 Since we have three distinct errors (IO, CSV parsing and not found), let's
 define an `enum` with three variants:
 
-```rust
+```rust,ignore
 #[derive(Debug)]
 enum CliError {
     Io(io::Error),
@@ -1945,7 +1997,7 @@ enum CliError {
 
 And now for impls on `Display` and `Error`:
 
-```rust
+```rust,ignore
 impl fmt::Display for CliError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
@@ -1974,7 +2026,7 @@ we'll need to convert from both `io::Error` and `csv::Error` to `CliError`.
 Those are the only external errors, so we'll only need two `From` impls for
 now:
 
-```rust
+```rust,ignore
 impl From<io::Error> for CliError {
     fn from(err: io::Error) -> CliError {
         CliError::Io(err)
@@ -1997,7 +2049,7 @@ With the `From` impls done, we only need to make two small tweaks to our
 `search` function: the return type and the "not found" error. Here it is in
 full:
 
-```rust
+```rust,ignore
 fn search<P: AsRef<Path>>
          (file_path: &Option<P>, city: &str)
          -> Result<Vec<PopulationCount>, CliError> {
@@ -2058,7 +2110,7 @@ be used in shell scripts.
 So let's start by adding the flags. Like before, we need to tweak the usage
 string and add a flag to the `Args` struct. The `docopt` crate does the rest:
 
-```rust
+```rust,ignore
 static USAGE: &'static str = "
 Usage: city-pop [options] [<data-path>] <city>
        city-pop --help
@@ -2079,7 +2131,7 @@ struct Args {
 Now we just need to implement our "quiet" functionality. This requires us to
 tweak the case analysis in `main`:
 
-```rust
+```rust,ignore
 match search(&args.arg_data_path, &args.arg_city) {
     Err(CliError::NotFound) if args.flag_quiet => process::exit(1),
     Err(err) => fatal!("{}", err),
@@ -2102,11 +2154,11 @@ out into the world and write your own programs and libraries with proper error
 handling.
 
 
-## The Short Story
+## The short story
 
 Since this chapter is long, it is useful to have a quick summary for error
-handling in Rust. These are some good "rules of thumb." They are emphatically *not*
-commandments. There are probably good reasons to break every one of these
+handling in Rust. These are some good "rules of thumb." They are emphatically
+*not* commandments. There are probably good reasons to break every one of these
 heuristics!
 
 * If you're writing short example code that would be overburdened by error
